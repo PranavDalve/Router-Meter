@@ -128,7 +128,7 @@ export default function DashboardPage() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch("http://localhost:4000/api/router-event")
+      const response = await fetch("http://3.111.204.121/api/router-event")
       if (!response.ok) throw new Error(`Failed: ${response.status}`)
       const fetchedData: RowData[] = await response.json()
       setData(fetchedData)
