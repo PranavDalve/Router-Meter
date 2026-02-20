@@ -391,7 +391,7 @@ export default function DashboardPage() {
   const endRow = Math.min(startRow + pageSize - 1, filteredRows)
 
   return (
-    <div className="flex flex-col bg-background -ml-10 min-h-screen">
+    <div className="flex flex-col bg-background min-h-screen">
       <main className="flex-1 container mx-auto py-8 px-4 md:px-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Network Activity</h1>
