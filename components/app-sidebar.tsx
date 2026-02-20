@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { LayoutDashboard, List, PlusCircle, Router } from "lucide-react"
+import { FileAxis3D, LayoutDashboard, List, PlusCircle, Router, SquareActivity } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -24,6 +24,8 @@ const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   // { title: "Register Device", url: "/register-meter", icon: PlusCircle },
   { title: "Meter List", url: "/meterlist", icon: List },
+  { title: "Domain Activity", url: "/dashboard/domainActivity", icon: SquareActivity },
+  { title: "Device Details", url: "/deviceDetails", icon: FileAxis3D },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
