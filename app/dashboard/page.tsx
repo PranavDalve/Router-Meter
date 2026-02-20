@@ -13,7 +13,7 @@ import {
   type ColumnFiltersState,
   type VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react"
+import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Filter, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -42,28 +42,85 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Downtime } from "@/components/Downtime"
 import { cn } from "@/lib/utils"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-type RowData = {
-  id?: number
-  device_id: string
-  timestamp: string | number
-  type: number
-  details: {
-    domain_activity: {
-      domain: string
-      category: string
-      platform: string
-      source_ip: string
-      destination_ip?: string
+function getPayload(details: any): any | null {
+  if (!details || typeof details !== 'object') return null;
+
+  // Return the first object value found under details
+  for (const value of Object.values(details)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value;
     }
   }
+  return null;
 }
+
+type RowData = {
+  id?: number;
+  device_id: string;
+  timestamp: string | number;
+  type: number;
+  details: Record<string, any>;   // ← more flexible than fixed domain_activity
+};
+
+// const columns: ColumnDef<RowData>[] = [
+//   {
+//     id: "srNo",
+//     header: "Sr No",
+//     cell: ({ row, table }) => row.index + 1 + table.getState().pagination.pageIndex * table.getState().pagination.pageSize,
+//     enableSorting: false,
+//     enableHiding: false,
+//   },
+//   {
+//     accessorKey: "device_id",
+//     header: ({ column }) => (
+//       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+//         Device ID <ArrowUpDown className="ml-2 h-4 w-4" />
+//       </Button>
+//     ),
+//   },
+//   {
+//     accessorKey: "timestamp",
+//     header: ({ column }) => (
+//       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+//         Timestamp <ArrowUpDown className="ml-2 h-4 w-4" />
+//       </Button>
+//     ),
+//     cell: ({ row }) => {
+//       const ts = row.getValue("timestamp") as string | number
+//       const timestampNum = typeof ts === "string" ? Number(ts) : ts
+//       const date = new Date(timestampNum * 1000)
+//       return <div>{isNaN(date.getTime()) ? "Invalid date" : date.toLocaleString()}</div>
+//     },
+//   },
+//   {
+//     accessorKey: "type",
+//     header: "Type",
+//   },
+//   {
+//     accessorFn: (row) => row?.details?.domain_activity?.platform ?? "N/A",
+//     id: "platform",
+//     header: "Platform",
+//   },
+//   {
+//     accessorFn: (row) => row?.details?.domain_activity?.source_ip ?? "N/A",
+//     id: "sourceIP",
+//     header: "Source IP",
+//   },
+//   {
+//     accessorFn: (row) => row?.details?.domain_activity?.category ?? "N/A",
+//     id: "category",
+//     header: "Category",
+//   },
+// ]
 
 const columns: ColumnDef<RowData>[] = [
   {
     id: "srNo",
     header: "Sr No",
-    cell: ({ row, table }) => row.index + 1 + table.getState().pagination.pageIndex * table.getState().pagination.pageSize,
+    cell: ({ row, table }) =>
+      row.index + 1 + table.getState().pagination.pageIndex * table.getState().pagination.pageSize,
     enableSorting: false,
     enableHiding: false,
   },
@@ -83,32 +140,88 @@ const columns: ColumnDef<RowData>[] = [
       </Button>
     ),
     cell: ({ row }) => {
-      const ts = row.getValue("timestamp") as string | number
-      const timestampNum = typeof ts === "string" ? Number(ts) : ts
-      const date = new Date(timestampNum * 1000)
-      return <div>{isNaN(date.getTime()) ? "Invalid date" : date.toLocaleString()}</div>
+      const ts = row.getValue("timestamp") as string | number;
+      const timestampNum = typeof ts === "string" ? Number(ts) : ts;
+      const date = new Date(timestampNum * 1000);
+      return <div>{isNaN(date.getTime()) ? "—" : date.toLocaleString()}</div>;
     },
   },
   {
-    accessorKey: "type",
-    header: "Type",
+      accessorKey: "type",
+      id: "Type",
+      header: "Type",
+      filterFn: (row, id, filterValue) => {
+        if (filterValue === undefined || filterValue === "all") return true;
+        const value = row.getValue(id) as number;
+        return String(value) === filterValue;
+      },
   },
+
+  // ────────────────────────────────────────────────
+  // Common / smart columns (work for both event types)
+  // ────────────────────────────────────────────────
   {
-    accessorFn: (row) => row?.details?.domain_activity?.platform ?? "N/A",
-    id: "platform",
-    header: "Platform",
-  },
-  {
-    accessorFn: (row) => row?.details?.domain_activity?.source_ip ?? "N/A",
     id: "sourceIP",
     header: "Source IP",
+    accessorFn: (row) => {
+      const payload = getPayload(row.details);
+      return payload?.source_ip ?? payload?.ip ?? "—";
+    },
   },
   {
-    accessorFn: (row) => row?.details?.domain_activity?.category ?? "N/A",
+    id: "platform",
+    header: "Platform",
+    accessorFn: (row) => {
+      const payload = getPayload(row.details);
+      return payload?.platform ?? "—";
+    },
+  },
+  {
     id: "category",
     header: "Category",
+    accessorFn: (row) => {
+      const payload = getPayload(row.details);
+      return payload?.category ?? "—";
+    },
   },
-]
+
+  // ────────────────────────────────────────────────
+  // Device-event specific columns
+  // ────────────────────────────────────────────────
+  {
+    id: "event",
+    header: "Event",
+    accessorFn: (row) => {
+      const payload = getPayload(row.details);
+      return payload?.event ?? "—";
+    },
+  },
+  {
+    id: "hostname",
+    header: "Hostname",
+    accessorFn: (row) => {
+      const payload = getPayload(row.details);
+      return payload?.hostname ?? "—";
+    },
+  },
+  {
+    id: "mac",
+    header: "MAC",
+    accessorFn: (row) => {
+      const payload = getPayload(row.details);
+      return payload?.mac ?? "—";
+    },
+  },
+  {
+    id: "connected_duration",
+    header: "Conn. Duration",
+    accessorFn: (row) => {
+      const payload = getPayload(row.details);
+      const sec = payload?.connected_duration_sec;
+      return sec != null ? `${sec.toLocaleString()} s` : "—";
+    },
+  },
+];
 
 export default function DashboardPage() {
   
@@ -128,7 +241,7 @@ export default function DashboardPage() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch("http://3.111.204.121/api/router-event")
+      const response = await fetch("http://localhost:4000/api/router-event")
       if (!response.ok) throw new Error(`Failed: ${response.status}`)
       const fetchedData: RowData[] = await response.json()
       setData(fetchedData)
@@ -156,11 +269,16 @@ export default function DashboardPage() {
 
   const uniqueIPs = React.useMemo(() => {
     if (!Array.isArray(data)) return []
+  
     const ips = new Set(
       data
-        .map(row => row?.details?.domain_activity?.source_ip)
+        .map(row => {
+          const payload = getPayload(row.details);
+          return payload?.source_ip ?? payload?.ip;
+        })
         .filter((ip): ip is string => typeof ip === "string" && ip.trim().length > 0)
     )
+  
     return Array.from(ips).sort()
   }, [data])
 
@@ -172,7 +290,11 @@ export default function DashboardPage() {
     }
 
     const ipLogs = data
-      .filter(row => row?.details?.domain_activity?.source_ip === selectedIP)
+      .filter(row => {
+        const payload = getPayload(row.details);
+        const ip = payload?.source_ip ?? payload?.ip;
+        return ip === selectedIP;
+      })
       .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
 
     if (ipLogs.length === 0) {
@@ -269,7 +391,7 @@ export default function DashboardPage() {
   const endRow = Math.min(startRow + pageSize - 1, filteredRows)
 
   return (
-    <div className="flex flex-col bg-background ml-10 min-h-screen">
+    <div className="flex flex-col bg-background -ml-10 min-h-screen">
       <main className="flex-1 container mx-auto py-8 px-4 md:px-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Network Activity</h1>
@@ -289,6 +411,7 @@ export default function DashboardPage() {
           <div className="space-y-6">
             {/* Controls */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-4">
+              {/* Global search / Device ID filter */}
               <Input
                 placeholder="Filter by Device ID..."
                 value={(table.getColumn("device_id")?.getFilterValue() as string) ?? ""}
@@ -297,6 +420,7 @@ export default function DashboardPage() {
               />
 
               <div className="flex flex-wrap items-center gap-4">
+                {/* Refresh + interval selector */}
                 <div className="flex items-center gap-2">
                   <Button
                     variant={autoRefresh ? "default" : "outline"}
@@ -324,12 +448,87 @@ export default function DashboardPage() {
                   )}
                 </div>
 
+                {/* Downtime button */}
                 <Downtime
                   data={data}
                   open={dialogOpen}
                   onOpenChange={setDialogOpen}
                 />
 
+                {/* New Filters Popover */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline">  
+                      <Filter className="mr-2 h-4 w-4" />
+                      Filters
+                      {columnFilters.length > 0 && (
+                        <span className="ml-2 rounded-full bg-primary px-2 py-1 text-xs text-primary-foreground">
+                          {columnFilters.length}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-80">
+                    <div className="grid gap-4">
+                      <h4 className="font-medium">Filter by Column</h4>
+
+                      {/* Filter: Type */}
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium">Type</label>
+                        <Select
+                          value={(table.getColumn("Type")?.getFilterValue() as string) ?? "all"}
+                          onValueChange={(value) =>
+                            table.getColumn("Type")?.setFilterValue(value === "all" ? undefined : value)
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="All types" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="0">0</SelectItem>
+                            <SelectItem value="1">1</SelectItem>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="11">11</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Filter: Platform */}
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium">Platform</label>
+                        <Input
+                          placeholder="e.g. Windows, Android, macOS"
+                          value={(table.getColumn("platform")?.getFilterValue() as string) ?? ""}
+                          onChange={(e) => table.getColumn("platform")?.setFilterValue(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Filter: Source IP */}
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium">Source IP</label>
+                        <Input
+                          placeholder="e.g. 192.168.1.100"
+                          value={(table.getColumn("sourceIP")?.getFilterValue() as string) ?? ""}
+                          onChange={(e) => table.getColumn("sourceIP")?.setFilterValue(e.target.value)}
+                        />
+                      </div>
+
+                      {/* Filter: Category */}
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium">Category</label>
+                        <Input
+                          placeholder="e.g. Social, Streaming, OTT"
+                          value={(table.getColumn("category")?.getFilterValue() as string) ?? ""}
+                          onChange={(e) => table.getColumn("category")?.setFilterValue(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Existing Columns visibility dropdown – keep it */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline">
@@ -337,16 +536,18 @@ export default function DashboardPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {table.getAllColumns().filter(col => col.getCanHide()).map(col => (
-                      <DropdownMenuCheckboxItem
-                        key={col.id}
-                        className="capitalize"
-                        checked={col.getIsVisible()}
-                        onCheckedChange={(v) => col.toggleVisibility(!!v)}
-                      >
-                        {col.id}
-                      </DropdownMenuCheckboxItem>
-                    ))}
+                    {table.getAllColumns()
+                      .filter((col) => col.getCanHide())
+                      .map((col) => (
+                        <DropdownMenuCheckboxItem
+                          key={col.id}
+                          className="capitalize"
+                          checked={col.getIsVisible()}
+                          onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                        >
+                          {col.id}
+                        </DropdownMenuCheckboxItem>
+                      ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

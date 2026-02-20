@@ -17,12 +17,12 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-const EXPANDED_WIDTH = "18rem"
-const COLLAPSED_WIDTH = "5rem"
+const EXPANDED_WIDTH = "14.9rem"
+const COLLAPSED_WIDTH = "4rem"
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Register Device", url: "/register-meter", icon: PlusCircle },
+  // { title: "Register Device", url: "/register-meter", icon: PlusCircle },
   { title: "Meter List", url: "/meterlist", icon: List },
 ]
 
@@ -82,7 +82,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   // Optional: subtle hover/active states in collapsed view
                   "group-data-[collapsible=icon]:hover:bg-accent/50",
                   "group-data-[collapsible=icon]:data-[active=true]:bg-accent/70",
-                  "ml-5 mt-3"
+                  "ml-3 mt-3"
                 )}
               >
                 <Link href={item.url} className="flex w-full items-center">
