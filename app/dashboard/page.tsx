@@ -449,11 +449,11 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Downtime button */}
-                <Downtime
+                {/* <Downtime
                   data={data}
                   open={dialogOpen}
                   onOpenChange={setDialogOpen}
-                />
+                /> */}
 
                 {/* New Filters Popover */}
                 <Popover>

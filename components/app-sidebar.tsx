@@ -23,9 +23,9 @@ const COLLAPSED_WIDTH = "4rem"
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   // { title: "Register Device", url: "/register-meter", icon: PlusCircle },
-  { title: "Meter List", url: "/meterlist", icon: List },
+  // { title: "Meter List", url: "/meterlist", icon: List },
   { title: "Domain Activity", url: "/dashboard/domainActivity", icon: SquareActivity },
-  { title: "Device Details", url: "/deviceDetails", icon: FileAxis3D },
+  { title: "Device Details", url: "/dashboard/deviceDetails", icon: FileAxis3D },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -40,10 +40,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       } as React.CSSProperties}
       {...props}
     >
-      <SidebarHeader className="p-4 border-b">
-        <div className="flex items-center gap-3 min-h-[2.5rem] relative">
-          <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0">
-            <Router className="h-6 w-6" />
+      <SidebarHeader className=" border-b">
+        <div className="flex items-center justify-center min-h-[2.3rem]">
+          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0">
+            <Router className="h-5.5 w-5.5" />
           </div>
 
           <div
@@ -52,7 +52,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               "group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:invisible group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:left-20"
             )}
           >
-            <div className="flex items-baseline gap-1 text-xl uppercase font-semibold whitespace-nowrap">
+            <div className="flex items-baseline gap-1 text-xl uppercase font-semibold whitespace-nowrap ml-3">
               Indirex
               <span className="text-sm lowercase text-primary">[router]</span>
             </div>
@@ -77,8 +77,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   "group-data-[collapsible=icon]:px-0",           // remove side padding so centering is true middle
 
                   // Make icons larger & consistent when collapsed
-                  "group-data-[collapsible=icon]:[&_svg]:h-6",
-                  "group-data-[collapsible=icon]:[&_svg]:w-6",
+                  "group-data-[collapsible=icon]:[&_svg]",
+                  "group-data-[collapsible=icon]:[&_svg]",
                   "group-data-[collapsible=icon]:[&_svg]:shrink-0",
 
                   // Optional: subtle hover/active states in collapsed view

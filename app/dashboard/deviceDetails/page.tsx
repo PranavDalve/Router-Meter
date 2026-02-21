@@ -13,9 +13,7 @@ import {
   type ColumnFiltersState,
   type VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Filter, RefreshCw, CalendarIcon, Calendar } from "lucide-react"
-import { format } from "date-fns"
-import { DateRange } from "react-day-picker"
+import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Filter, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -44,11 +42,12 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { DateRange } from "react-day-picker"
+import { addDays } from "date-fns"
 import { DateRangePicker } from "@/components/date-range-picker"
 
 function getPayload(details: any): any | null {
   if (!details || typeof details !== 'object') return null
-
   for (const value of Object.values(details)) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       return value
@@ -64,6 +63,40 @@ type RowData = {
   type: number
   details: Record<string, any>
 }
+
+// Custom filter function for timestamp (Unix seconds → Date comparison)
+const dateRangeFilterFn = (
+    row: any,
+    columnId: string,
+    filterValue: DateRange | undefined
+  ) => {
+    if (!filterValue?.from && !filterValue?.to) return true
+  
+    const ts = row.getValue(columnId) as string | number
+    const timestampNum = typeof ts === "string" ? Number(ts) : ts
+    const rowDate = new Date(timestampNum * 1000) // assuming seconds → ms
+  
+    if (isNaN(rowDate.getTime())) return false
+  
+    const start = filterValue.from ? new Date(filterValue.from) : undefined
+    const end = filterValue.to ? new Date(filterValue.to) : undefined
+  
+    // Normalize to start/end of day if needed (optional)
+    if (start) start.setHours(0, 0, 0, 0)
+    if (end) end.setHours(23, 59, 59, 999)
+  
+    if (start && end) {
+      return rowDate >= start && rowDate <= end
+    }
+    if (start) {
+      return rowDate >= start
+    }
+    if (end) {
+      return rowDate <= end
+    }
+  
+    return true
+  }
 
 const columns: ColumnDef<RowData>[] = [
   {
@@ -84,6 +117,20 @@ const columns: ColumnDef<RowData>[] = [
   },
   {
     accessorKey: "timestamp",
+    header: ({ column }) => (
+      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        Timestamp <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const ts = row.getValue("timestamp") as string | number
+      const timestampNum = typeof ts === "string" ? Number(ts) : ts
+      const date = new Date(timestampNum * 1000)
+      return <div>{isNaN(date.getTime()) ? "—" : date.toLocaleString()}</div>
+    },
+  },
+  {
+    accessorKey: "timestamp",
     id: "timestamp",
     header: ({ column }) => (
       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
@@ -96,42 +143,12 @@ const columns: ColumnDef<RowData>[] = [
       const date = new Date(timestampNum * 1000)
       return <div>{isNaN(date.getTime()) ? "—" : date.toLocaleString()}</div>
     },
-    filterFn: (row, columnId, filterValue: DateRange | undefined) => {
-      if (!filterValue?.from && !filterValue?.to) return true
-
-      const ts = row.getValue(columnId) as string | number
-      const timestampNum = typeof ts === "string" ? Number(ts) : ts
-      const rowDate = new Date(timestampNum * 1000)
-
-      if (isNaN(rowDate.getTime())) return false
-
-      let start = filterValue.from ? new Date(filterValue.from) : undefined
-      let end = filterValue.to ? new Date(filterValue.to) : undefined
-
-      if (start) start.setHours(0, 0, 0, 0)
-      if (end) end.setHours(23, 59, 59, 999)
-
-      if (start && end) return rowDate >= start && rowDate <= end
-      if (start) return rowDate >= start
-      if (end) return rowDate <= end
-
-      return true
-    },
+    filterFn: dateRangeFilterFn, // ← attach the custom filter here
   },
   {
     accessorKey: "type",
     id: "type",
-    header: ({ column }) => {
-      const filterVal = column.getFilterValue() as string | undefined
-      return (
-        <div className="flex items-center gap-1">
-          Type
-          {filterVal && filterVal !== "all" && (
-            <span className="text-xs text-muted-foreground">({filterVal})</span>
-          )}
-        </div>
-      )
-    },
+    header: "Type",
     filterFn: (row, id, filterValue: string | undefined) => {
       if (!filterValue || filterValue === "all") return true
       return String(row.getValue(id)) === filterValue
@@ -146,24 +163,25 @@ const columns: ColumnDef<RowData>[] = [
     },
   },
   {
-    id: "platform",
-    header: "Platform",
+    id: "event",
+    header: "Event",
     accessorFn: (row) => {
       const payload = getPayload(row.details)
-      return payload?.platform ?? "—"
+      return payload?.event ?? payload?.event_type ?? payload?.action ?? "—"
     },
   },
   {
-    id: "category",
-    header: "Category",
+    id: "connected_duration",
+    header: "Conn. Duration",
     accessorFn: (row) => {
-      const payload = getPayload(row.details)
-      return payload?.category ?? "—"
+      const payload = getPayload(row.details);
+      const sec = payload?.connected_duration_sec;
+      return sec != null ? `${sec.toLocaleString()} s` : "—";
     },
   },
 ]
 
-export default function Type10And11Page() {
+export default function Type0And1Page() {
   const [data, setData] = React.useState<RowData[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -172,6 +190,7 @@ export default function Type10And11Page() {
   const [refreshInterval, setRefreshInterval] = React.useState<3 | 5 | 10>(5)
   const intervalRef = React.useRef<NodeJS.Timeout | null>(null)
 
+  // Date range state (shared with filter)
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined)
 
   const fetchData = React.useCallback(async () => {
@@ -184,7 +203,8 @@ export default function Type10And11Page() {
       if (!response.ok) throw new Error(`Failed: ${response.status}`)
       const allData: RowData[] = await response.json()
 
-      const filtered = allData.filter(row => row.type === 10 || row.type === 11)
+      // Only type 0 and 1
+      const filtered = allData.filter(row => row.type === 0 || row.type === 1)
       setData(filtered)
     } catch (err: any) {
       setError(err.message || "Failed to load data")
@@ -202,6 +222,7 @@ export default function Type10And11Page() {
       intervalRef.current = setInterval(fetchData, refreshInterval * 1000)
     } else if (intervalRef.current) {
       clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -235,7 +256,6 @@ export default function Type10And11Page() {
     },
   })
 
-  // Apply date range filter to timestamp column
   React.useEffect(() => {
     table.getColumn("timestamp")?.setFilterValue(dateRange)
   }, [dateRange, table])
@@ -251,7 +271,7 @@ export default function Type10And11Page() {
     <div className="flex flex-col bg-background min-h-screen">
       <main className="flex-1 container mx-auto py-8 px-4 md:px-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Domain Activity</h1>
+          <h1 className="text-2xl font-bold">Device Details</h1>
         </div>
         <Separator className="-mt-5 mb-2" />
 
@@ -315,11 +335,49 @@ export default function Type10And11Page() {
                     </Button>
                   </PopoverTrigger>
 
-                  <PopoverContent className="w-96">
+                  <PopoverContent className="w-80">
                     <div className="grid gap-4">
                       <h4 className="font-medium">Filter by Column</h4>
 
-                      {/* Date Range Filter */}
+                      {/* Type Filter – only 0 and 1 */}
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium">Type</label>
+                        <Select
+                          value={
+                            (table.getColumn("type")?.getFilterValue() as string | undefined) ?? "all"
+                          }
+                          onValueChange={(value) =>
+                            table.getColumn("type")?.setFilterValue(value === "all" ? undefined : value)
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="All types" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="0">Type 0</SelectItem>
+                            <SelectItem value="1">Type 1</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium">Source IP</label>
+                        <Input
+                          placeholder="e.g. 192.168.1.100"
+                          value={(table.getColumn("sourceIP")?.getFilterValue() as string) ?? ""}
+                          onChange={(e) => table.getColumn("sourceIP")?.setFilterValue(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium">Event</label>
+                        <Input
+                          placeholder="e.g. connect, disconnect"
+                          value={(table.getColumn("event")?.getFilterValue() as string) ?? ""}
+                          onChange={(e) => table.getColumn("event")?.setFilterValue(e.target.value)}
+                        />
+                      </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Date Range</label>
                         <div className="flex items-center gap-2">
@@ -340,55 +398,6 @@ export default function Type10And11Page() {
                             )}
                         </div>
                         </div>
-
-                      {/* Type Filter */}
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium">Type</label>
-                        <Select
-                          value={
-                            (table.getColumn("type")?.getFilterValue() as string | undefined) ?? "all"
-                          }
-                          onValueChange={(value) =>
-                            table.getColumn("type")?.setFilterValue(value === "all" ? undefined : value)
-                          }
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="All types" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
-                            <SelectItem value="10">Type 10</SelectItem>
-                            <SelectItem value="11">Type 11</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium">Platform</label>
-                        <Input
-                          placeholder="e.g. Windows, Android"
-                          value={(table.getColumn("platform")?.getFilterValue() as string) ?? ""}
-                          onChange={(e) => table.getColumn("platform")?.setFilterValue(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium">Source IP</label>
-                        <Input
-                          placeholder="e.g. 192.168.1.100"
-                          value={(table.getColumn("sourceIP")?.getFilterValue() as string) ?? ""}
-                          onChange={(e) => table.getColumn("sourceIP")?.setFilterValue(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium">Category</label>
-                        <Input
-                          placeholder="e.g. OTT, Social"
-                          value={(table.getColumn("category")?.getFilterValue() as string) ?? ""}
-                          onChange={(e) => table.getColumn("category")?.setFilterValue(e.target.value)}
-                        />
-                      </div>
                     </div>
                   </PopoverContent>
                 </Popover>
@@ -409,7 +418,7 @@ export default function Type10And11Page() {
                           checked={col.getIsVisible()}
                           onCheckedChange={(v) => col.toggleVisibility(!!v)}
                         >
-                          {col.id}
+                          {col.id === "connDuration" ? "Conn. Duration" : col.id}
                         </DropdownMenuCheckboxItem>
                       ))}
                   </DropdownMenuContent>
@@ -417,7 +426,6 @@ export default function Type10And11Page() {
               </div>
             </div>
 
-            {/* Table Container */}
             <div className="rounded-md border overflow-hidden flex flex-col">
               <div className="flex-1 overflow-auto max-h-[60vh]">
                 <Table>
@@ -450,7 +458,7 @@ export default function Type10And11Page() {
                       <TableRow>
                         <TableCell colSpan={columns.length} className="h-32 text-center">
                           <p className="text-muted-foreground text-lg">
-                            {loading ? "Loading data..." : "No matching records found (only type 10 & 11)"}
+                            {loading ? "Loading data..." : "No matching records found"}
                           </p>
                         </TableCell>
                       </TableRow>
@@ -513,7 +521,7 @@ export default function Type10And11Page() {
 
         {!loading && !error && data.length === 0 && (
           <div className="text-center py-20 text-xl text-muted-foreground">
-            No data found for type 10 or 11.
+            No data found for type 0 or 1.
           </div>
         )}
       </main>
