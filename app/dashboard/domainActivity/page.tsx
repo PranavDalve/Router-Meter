@@ -46,23 +46,47 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils"
 import { DateRangePicker } from "@/components/date-range-picker"
 
-function getPayload(details: any): any | null {
-  if (!details || typeof details !== 'object') return null
-
-  for (const value of Object.values(details)) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return value
-    }
-  }
-  return null
-}
-
 type RowData = {
   id?: number
   device_id: string
   timestamp: string | number
   type: number
   details: Record<string, any>
+}
+
+function findValue(
+  details: Record<string, any> | null | undefined,
+  fieldNames: string | string[],
+  sectionPriority: string[] = ["domain_activity", "device_details"]
+): any {
+  if (!details || typeof details !== "object") return undefined;
+
+  const fields = Array.isArray(fieldNames) ? fieldNames : [fieldNames];
+
+  // 1. Try preferred sections first (in the order given)
+  for (const section of sectionPriority) {
+    const obj = details[section];
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      for (const field of fields) {
+        if (obj[field] !== undefined && obj[field] !== null) {
+          return obj[field];
+        }
+      }
+    }
+  }
+
+  // 2. Fallback: search in any sub-object
+  for (const value of Object.values(details)) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      for (const field of fields) {
+        if (value[field] !== undefined && value[field] !== null) {
+          return value[field];
+        }
+      }
+    }
+  }
+
+  return undefined;
 }
 
 const columns: ColumnDef<RowData>[] = [
@@ -137,30 +161,25 @@ const columns: ColumnDef<RowData>[] = [
       return String(row.getValue(id)) === filterValue
     },
   },
-  {
-    id: "sourceIP",
-    header: "Source IP",
-    accessorFn: (row) => {
-      const payload = getPayload(row.details)
-      return payload?.source_ip ?? payload?.ip ?? "—"
+  
+    {
+      id: "sourceIP",
+      header: "Source IP",
+      accessorFn: (row) =>
+        findValue(row.details, ["source_ip_v4", "ip", "ip_v4"]) ?? "—",
     },
-  },
-  {
-    id: "platform",
-    header: "Platform",
-    accessorFn: (row) => {
-      const payload = getPayload(row.details)
-      return payload?.platform ?? "—"
+    {
+      id: "platform",
+      header: "Platform",
+      accessorFn: (row) =>
+        findValue(row.details, "platform") ?? "—",
     },
-  },
-  {
-    id: "category",
-    header: "Category",
-    accessorFn: (row) => {
-      const payload = getPayload(row.details)
-      return payload?.category ?? "—"
+    {
+      id: "category",
+      header: "Category",
+      accessorFn: (row) =>
+        findValue(row.details, ["category", "service_category"]) ?? "—",
     },
-  },
 ]
 
 export default function Type10And11Page() {

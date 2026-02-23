@@ -117,20 +117,6 @@ const columns: ColumnDef<RowData>[] = [
   },
   {
     accessorKey: "timestamp",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Timestamp <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const ts = row.getValue("timestamp") as string | number
-      const timestampNum = typeof ts === "string" ? Number(ts) : ts
-      const date = new Date(timestampNum * 1000)
-      return <div>{isNaN(date.getTime()) ? "—" : date.toLocaleString()}</div>
-    },
-  },
-  {
-    accessorKey: "timestamp",
     id: "timestamp",
     header: ({ column }) => (
       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>

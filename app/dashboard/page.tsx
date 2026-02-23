@@ -44,17 +44,6 @@ import { Downtime } from "@/components/Downtime"
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-function getPayload(details: any): any | null {
-  if (!details || typeof details !== 'object') return null;
-
-  // Return the first object value found under details
-  for (const value of Object.values(details)) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return value;
-    }
-  }
-  return null;
-}
 
 type RowData = {
   id?: number;
@@ -64,125 +53,104 @@ type RowData = {
   details: Record<string, any>;   // ← more flexible than fixed domain_activity
 };
 
-// const columns: ColumnDef<RowData>[] = [
-//   {
-//     id: "srNo",
-//     header: "Sr No",
-//     cell: ({ row, table }) => row.index + 1 + table.getState().pagination.pageIndex * table.getState().pagination.pageSize,
-//     enableSorting: false,
-//     enableHiding: false,
-//   },
-//   {
-//     accessorKey: "device_id",
-//     header: ({ column }) => (
-//       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-//         Device ID <ArrowUpDown className="ml-2 h-4 w-4" />
-//       </Button>
-//     ),
-//   },
-//   {
-//     accessorKey: "timestamp",
-//     header: ({ column }) => (
-//       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-//         Timestamp <ArrowUpDown className="ml-2 h-4 w-4" />
-//       </Button>
-//     ),
-//     cell: ({ row }) => {
-//       const ts = row.getValue("timestamp") as string | number
-//       const timestampNum = typeof ts === "string" ? Number(ts) : ts
-//       const date = new Date(timestampNum * 1000)
-//       return <div>{isNaN(date.getTime()) ? "Invalid date" : date.toLocaleString()}</div>
-//     },
-//   },
-//   {
-//     accessorKey: "type",
-//     header: "Type",
-//   },
-//   {
-//     accessorFn: (row) => row?.details?.domain_activity?.platform ?? "N/A",
-//     id: "platform",
-//     header: "Platform",
-//   },
-//   {
-//     accessorFn: (row) => row?.details?.domain_activity?.source_ip ?? "N/A",
-//     id: "sourceIP",
-//     header: "Source IP",
-//   },
-//   {
-//     accessorFn: (row) => row?.details?.domain_activity?.category ?? "N/A",
-//     id: "category",
-//     header: "Category",
-//   },
-// ]
+function findValue(
+  details: Record<string, any> | null | undefined,
+  fieldNames: string | string[],
+  sectionPriority: string[] = ["domain_activity", "device_details"]
+): any {
+  if (!details || typeof details !== "object") return undefined;
+
+  const fields = Array.isArray(fieldNames) ? fieldNames : [fieldNames];
+
+  // 1. Try preferred sections first (in the order given)
+  for (const section of sectionPriority) {
+    const obj = details[section];
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      for (const field of fields) {
+        if (obj[field] !== undefined && obj[field] !== null) {
+          return obj[field];
+        }
+      }
+    }
+  }
+
+  // 2. Fallback: search in any sub-object
+  for (const value of Object.values(details)) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      for (const field of fields) {
+        if (value[field] !== undefined && value[field] !== null) {
+          return value[field];
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
 
 const columns: ColumnDef<RowData>[] = [
-  {
-    id: "srNo",
-    header: "Sr No",
-    cell: ({ row, table }) =>
-      row.index + 1 + table.getState().pagination.pageIndex * table.getState().pagination.pageSize,
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "device_id",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Device ID <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-  },
-  {
-    accessorKey: "timestamp",
-    header: ({ column }) => (
-      <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Timestamp <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => {
-      const ts = row.getValue("timestamp") as string | number;
-      const timestampNum = typeof ts === "string" ? Number(ts) : ts;
-      const date = new Date(timestampNum * 1000);
-      return <div>{isNaN(date.getTime()) ? "—" : date.toLocaleString()}</div>;
-    },
-  },
-  {
-      accessorKey: "type",
-      id: "Type",
-      header: "Type",
-      filterFn: (row, id, filterValue) => {
-        if (filterValue === undefined || filterValue === "all") return true;
-        const value = row.getValue(id) as number;
-        return String(value) === filterValue;
-      },
-  },
+  // your existing srNo, device_id, timestamp, type columns stay the same
 
   // ────────────────────────────────────────────────
-  // Common / smart columns (work for both event types)
+  // Flexible columns that search across details sub-objects
   // ────────────────────────────────────────────────
+{
+      id: "srNo",
+      header: "Sr No",
+      cell: ({ row, table }) =>
+      row.index + 1 + table.getState().pagination.pageIndex * table.getState().pagination.pageSize,
+      enableSorting: false,
+      enableHiding: false,
+  },
+    {
+      accessorKey: "device_id",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Device ID <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+    },
+    {
+      accessorKey: "timestamp",
+      header: ({ column }) => (
+        <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+          Timestamp <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const ts = row.getValue("timestamp") as string | number;
+        const timestampNum = typeof ts === "string" ? Number(ts) : ts;
+        const date = new Date(timestampNum * 1000);
+        return <div>{isNaN(date.getTime()) ? "—" : date.toLocaleString()}</div>;
+      },
+    },
+    {
+        accessorKey: "type",
+        id: "Type",
+        header: "Type",
+        filterFn: (row, id, filterValue) => {
+          if (filterValue === undefined || filterValue === "all") return true;
+          const value = row.getValue(id) as number;
+          return String(value) === filterValue;
+        },
+    },
   {
     id: "sourceIP",
     header: "Source IP",
-    accessorFn: (row) => {
-      const payload = getPayload(row.details);
-      return payload?.source_ip ?? payload?.ip ?? "—";
-    },
+    accessorFn: (row) =>
+      findValue(row.details, ["source_ip_v4", "ip", "ip_v4"]) ?? "—",
   },
   {
     id: "platform",
     header: "Platform",
-    accessorFn: (row) => {
-      const payload = getPayload(row.details);
-      return payload?.platform ?? "—";
-    },
+    accessorFn: (row) =>
+      findValue(row.details, "platform") ?? "—",
   },
   {
     id: "category",
     header: "Category",
-    accessorFn: (row) => {
-      const payload = getPayload(row.details);
-      return payload?.category ?? "—";
-    },
+    accessorFn: (row) =>
+      findValue(row.details, ["category", "service_category"]) ?? "—",
   },
 
   // ────────────────────────────────────────────────
@@ -191,36 +159,36 @@ const columns: ColumnDef<RowData>[] = [
   {
     id: "event",
     header: "Event",
-    accessorFn: (row) => {
-      const payload = getPayload(row.details);
-      return payload?.event ?? "—";
-    },
+    accessorFn: (row) =>
+      findValue(row.details, "event") ?? "—",
   },
   {
     id: "hostname",
     header: "Hostname",
-    accessorFn: (row) => {
-      const payload = getPayload(row.details);
-      return payload?.hostname ?? "—";
-    },
+    accessorFn: (row) =>
+      findValue(row.details, "hostname") ?? "—",
   },
   {
     id: "mac",
     header: "MAC",
-    accessorFn: (row) => {
-      const payload = getPayload(row.details);
-      return payload?.mac ?? "—";
-    },
+    accessorFn: (row) =>
+      findValue(row.details, "mac") ?? "—",
   },
   {
     id: "connected_duration",
     header: "Conn. Duration",
     accessorFn: (row) => {
-      const payload = getPayload(row.details);
-      const sec = payload?.connected_duration_sec;
-      return sec != null ? `${sec.toLocaleString()} s` : "—";
+      const sec = findValue(row.details, "connected_duration_sec");
+      return sec != null ? `${Number(sec).toLocaleString()} s` : "—";
     },
   },
+
+  // You can add more later the same way, example:
+  // {
+  //   id: "domain",
+  //   header: "Domain",
+  //   accessorFn: (row) => findValue(row.details, "domain") ?? "—",
+  // },
 ];
 
 export default function DashboardPage() {
@@ -268,19 +236,22 @@ export default function DashboardPage() {
   }, [autoRefresh, refreshInterval, fetchData])
 
   const uniqueIPs = React.useMemo(() => {
-    if (!Array.isArray(data)) return []
+    if (!Array.isArray(data)) return [];
   
     const ips = new Set(
       data
         .map(row => {
-          const payload = getPayload(row.details);
-          return payload?.source_ip ?? payload?.ip;
+          // Look for any of these IP-related fields, in priority order
+          return (
+            findValue(row.details, ["source_ip", "source_ip_v4", "ip", "ip_v4"]) ??
+            findValue(row.details, "source_ip_v6")   // optional: include IPv6 if you want
+          );
         })
         .filter((ip): ip is string => typeof ip === "string" && ip.trim().length > 0)
-    )
+    );
   
-    return Array.from(ips).sort()
-  }, [data])
+    return Array.from(ips).sort();
+  }, [data]);
 
   // Downtime calculation (unchanged from previous version)
   React.useEffect(() => {
@@ -290,12 +261,17 @@ export default function DashboardPage() {
     }
 
     const ipLogs = data
-      .filter(row => {
-        const payload = getPayload(row.details);
-        const ip = payload?.source_ip ?? payload?.ip;
-        return ip === selectedIP;
-      })
-      .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+    .filter(row => {
+      const ip = findValue(row.details, [
+        "source_ip",
+        "source_ip_v4",
+        "ip",
+        "ip_v4",
+        // optionally add more aliases if needed: "client_ip", etc.
+      ]);
+      return ip === selectedIP;
+    })
+    .sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
 
     if (ipLogs.length === 0) {
       setDowntimeData(null)
