@@ -2,27 +2,19 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { GalleryVerticalEnd } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldSeparator,
-} from "@/components/ui/field"
-import { cn } from "@/lib/utils"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { toast } from "sonner"
 
 export function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false) // 👈 NEW
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,7 +24,7 @@ export function LoginForm() {
       const res = await fetch("http://localhost:4000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       })
 
@@ -46,7 +38,6 @@ export function LoginForm() {
         return
       }
 
-      // Success
       toast.success("Login successful", {
         description: "Welcome back!",
         duration: 3000,
@@ -77,6 +68,7 @@ export function LoginForm() {
           </p>
         </div>
 
+        {/* Email */}
         <Field>
           <FieldLabel htmlFor="email">Email</FieldLabel>
           <Input
@@ -91,32 +83,44 @@ export function LoginForm() {
           />
         </Field>
 
+        {/* Password with toggle */}
         <Field>
-          <div className="flex items-center">
-            <FieldLabel htmlFor="password">Password</FieldLabel>
-            <a
-              href="#"
-              className="ml-auto text-sm underline-offset-4 hover:underline"
+          <FieldLabel htmlFor="password">Password</FieldLabel>
+
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"} // 👈 toggle
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={loading}
+              autoComplete="current-password"
+              className="pr-10"
+            />
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
             >
-              Forgot your password?
-            </a>
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
           </div>
-          <Input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={loading}
-            autoComplete="current-password"
-          />
         </Field>
 
+        {/* Submit */}
         <Field>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? (
               <>
-                <span className="mr-2 animate-spin">⏳</span>
+                <span className="mr-2 animate-spin"></span>
                 Logging in...
               </>
             ) : (
