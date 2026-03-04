@@ -6,6 +6,9 @@ import {
   Cpu, 
   ShieldCheck, 
   Smartphone,
+  Globe,
+  Layers,
+  ListChecks
 } from 'lucide-react';
 
 // Modular Components
@@ -14,8 +17,10 @@ import { TrafficChart } from '@/components/TrafficChart';
 import { PlatformChart } from '@/components/PlatformChart';
 import { DataTable, type RowData } from '@/components/DataTable';
 import { findValue } from '@/lib/dataUtils';
+import { useDashboard } from '@/components/DashboardProvider';
 
 // --- Mock Data (Fallback) ---
+
 const MOCK_TABLE_DATA: RowData[] = [
   { id: 1, deviceId: 'Router00003', timestamp: 1740933701, type: 10, details: { domain_activity: { platform: 'Windows', category: 'OTHER', event: 'connected', hostname: 'DESKTOP-OCOPN N4', mac: 'F8:5E:A0:DD:98:01', source_ip_v4: '192.168.3.109' } } },
   { id: 2, deviceId: 'Router00008', timestamp: 1740919478, type: 10, details: { domain_activity: { platform: 'Android', category: 'STREAMING', event: 'active', hostname: 'Pixel-7-Pro', mac: 'A4:5E:B0:CC:12:34', source_ip_v4: '192.168.1.10' } } },
@@ -34,13 +39,21 @@ const CHART_DATA = [
 ];
 
 export default function DashboardPage() {
+  // User's data fetching logic
   const [data, setData] = useState<RowData[]>([]);
   const [loading, setLoading] = useState(true);
+  const { autoRefresh, refreshTrigger, setTitle, setSubtitle } = useDashboard();
+  const [refreshInterval] = useState<number>(5);
+
+  useEffect(() => {
+    setTitle("Network Activity");
+    setSubtitle("Real-time monitoring of connected devices and traffic.");
+  }, [setTitle, setSubtitle]);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:4000/api/router-event");
+      const response = await fetch("https://api-router-dev.indirex.io/api/router-event");
       if (!response.ok) throw new Error(`Failed: ${response.status}`);
       const fetchedData: RowData[] = await response.json();
       setData(fetchedData);
@@ -54,8 +67,46 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, refreshTrigger]);
 
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (autoRefresh) {
+      interval = setInterval(fetchData, refreshInterval * 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoRefresh, refreshInterval, fetchData]);
+
+  // Calculate stats from real data
+  const stats = useMemo(() => {
+    const totalEvents = data.length;
+    
+    const activeDevices = data.filter(item => {
+      const event = findValue(item.details, "event");
+      return event === "connected" || event === "active";
+    }).length;
+
+    const uniqueIPs = new Set(
+      data.map(item => findValue(item.details, ["source_ip_v4", "ip", "ip_v4"]))
+          .filter(Boolean)
+    ).size;
+
+    const uniquePlatforms = new Set(
+      data.map(item => findValue(item.details, "platform"))
+          .filter(Boolean)
+    ).size;
+
+    return {
+      totalEvents,
+      activeDevices,
+      uniqueIPs,
+      uniquePlatforms
+    };
+  }, [data]);
+
+  // Calculate platform distribution from real data
   const platformStats = useMemo(() => {
     const counts: Record<string, number> = {};
     data.forEach(item => {
@@ -75,22 +126,43 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Active Devices" value={data.length.toString()} icon={Smartphone} trend="+2" />
-        <StatCard title="Total Traffic" value="4.2 GB" icon={Activity} trend="+12%" />
-        <StatCard title="CPU Load" value="24%" icon={Cpu} trend="-5%" />
-        <StatCard title="Security Score" value="98/100" icon={ShieldCheck} />
+        <StatCard 
+          title="Active Connections" 
+          value={stats.activeDevices.toString()} 
+          icon={Smartphone} 
+          trend={stats.activeDevices > 0 ? "+1" : "0"} 
+        />
+        <StatCard 
+          title="Total Event Logs" 
+          value={stats.totalEvents.toString()} 
+          icon={ListChecks} 
+          trend={stats.totalEvents > 0 ? `+${stats.totalEvents}` : "0"} 
+        />
+        <StatCard 
+          title="Unique Source IPs" 
+          value={stats.uniqueIPs.toString()} 
+          icon={Globe} 
+        />
+        <StatCard 
+          title="Detected Platforms" 
+          value={stats.uniquePlatforms.toString()} 
+          icon={Layers} 
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      {/* Charts Section */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* <div className="lg:col-span-2">
           <TrafficChart data={CHART_DATA} />
         </div>
         <div>
           <PlatformChart data={platformStats} />
-        </div>
+        </div> */}
       </div>
 
+      {/* Data Table */}
       <DataTable data={data} />
     </div>
   );

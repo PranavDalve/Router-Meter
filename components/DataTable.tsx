@@ -138,15 +138,6 @@ const columns: ColumnDef<RowData>[] = [
       return sec != null ? `${Number(sec).toLocaleString()} s` : "—";
     },
   },
-  {
-    id: "actions",
-    header: "",
-    cell: () => (
-      <button className="p-1.5 rounded-lg hover:bg-white/10 text-brand-muted transition-all">
-        <MoreHorizontal size={16} />
-      </button>
-    )
-  }
 ];
 
 interface DataTableProps {
@@ -159,6 +150,7 @@ export const DataTable = ({ data }: DataTableProps) => {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
+  const [isColumnsOpen, setIsColumnsOpen] = React.useState(false);
 
   const table = useReactTable<RowData>({
     data,
@@ -199,7 +191,69 @@ export const DataTable = ({ data }: DataTableProps) => {
           </div>
           <div className="relative">
             <button 
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              onClick={() => {
+                setIsColumnsOpen(!isColumnsOpen);
+                setIsFilterOpen(false);
+              }}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 border rounded-xl text-xs font-medium transition-colors",
+                isColumnsOpen
+                  ? "bg-brand-accent/10 border-brand-accent text-brand-accent"
+                  : "bg-brand-bg border-brand-border text-brand-muted hover:bg-brand-accent/10 hover:text-brand-accent"
+              )}
+            >
+              <ArrowUpDown size={14} className="rotate-90" />
+              Columns
+            </button>
+
+            <AnimatePresence>
+              {isColumnsOpen && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 mt-2 w-56 bg-brand-card border border-brand-border rounded-2xl shadow-2xl z-50 p-4"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold text-sm">Toggle Columns</h4>
+                    <button onClick={() => setIsColumnsOpen(false)} className="text-brand-muted hover:text-brand-text">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                    {table
+                      .getAllColumns()
+                      .filter((column) => column.getCanHide())
+                      .map((column) => {
+                        return (
+                          <label
+                            key={column.id}
+                            className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-brand-bg cursor-pointer transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={column.getIsVisible()}
+                              onChange={(e) => column.toggleVisibility(!!e.target.checked)}
+                              className="w-4 h-4 rounded border-brand-border text-brand-accent focus:ring-brand-accent bg-transparent"
+                            />
+                            <span className="text-xs capitalize text-brand-text">
+                              {column.id.replace(/([A-Z])/g, ' $1').trim()}
+                            </span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="relative">
+            <button 
+              onClick={() => {
+                setIsFilterOpen(!isFilterOpen);
+                setIsColumnsOpen(false);
+              }}
               className={cn(
                 "flex items-center gap-2 px-3 py-1.5 border rounded-xl text-xs font-medium transition-colors",
                 isFilterOpen || columnFilters.length > 0
@@ -255,6 +309,17 @@ export const DataTable = ({ data }: DataTableProps) => {
                         <option value="11">Type 11</option>
                         <option value="0">Type 0</option>
                       </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-brand-muted">Source IP</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g. 192.168.1.1"
+                        value={(table.getColumn("sourceIP")?.getFilterValue() as string) ?? ""}
+                        onChange={(e) => table.getColumn("sourceIP")?.setFilterValue(e.target.value)}
+                        className="w-full bg-brand-bg border border-brand-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-brand-accent/50"
+                      />
                     </div>
 
                     <div className="space-y-1.5">
